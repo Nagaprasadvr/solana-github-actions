@@ -1,13 +1,12 @@
-# github action workflows to build solana sbf program , rust crates and test them
 name: CI
 
-# trigger workflows on pr
+# Trigger workflow on pull requests to `main`
 on:
-  # uncomment if CI is needed to run on push
+  # Uncomment below if CI should run on direct pushes to `main`
   # push:
   #   branches: ["main"]
   pull_request:
-    branches: ["main"] # change branch accordingly
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
@@ -20,23 +19,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Install Rust if its missing on the env
-      # Setup Environment
-      - name: Install Rust (if missing)
+      # Install Rust toolchain if missing (typically not needed on ubuntu-latest)
+      - name: Ensure Rust is available
         run: |
           if ! command -v cargo &> /dev/null; then
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           fi
 
-      # cache solana tools
+      # Cache Solana tools directory
       - name: Cache Solana tools
         uses: actions/cache@v4
         with:
           path: ~/.local/share/solana
           key: ${{ runner.os }}-solana-anza-v1
 
-      # Install solana tools like (cli, buil-sbf etc)
+      # Install Solana CLI and cargo-build-sbf if not cached
       - name: Install Solana tools (cargo-build-sbf)
         run: |
           if [ ! -f "$HOME/.local/share/solana/install/active_release/bin/cargo-build-sbf" ]; then
@@ -44,8 +42,8 @@ jobs:
           fi
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
-      # Cache cargo compiled deps
-      - name: Cache cargo registry and build artifacts
+      # Cache Rust crates and build artifacts
+      - name: Cache cargo registry and target artifacts
         uses: actions/cache@v4
         with:
           path: |
@@ -56,23 +54,23 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      # If your repo is a workspace use this to build
-      # all the crates in the workspace or else comment this
-      - name: Build
+      # Run this only if using a cargo workspace
+      # Build all Rust crates (adjust if not using a workspace)
+      - name: Build Rust project
         run: cargo build --verbose
 
-      # Build SBF solana program by passing the manifest path
+      # Build Solana program using cargo-build-sbf
       - name: Build Solana SBF program
-        run: cargo build-sbf --manifest-path=program/Cargo.toml --verbos
+        run: cargo build-sbf --manifest-path=program/Cargo.toml --verbose
 
-      # Run cargo test (unit , integration etc) with required feature flags or args
+      # Run all tests (unit, integration, etc)
       - name: Run tests
         run: cargo test --verbose
 
-      # Run cargo clippy to cleanup code
+      # Run Clippy for linting
       - name: Run clippy
-        run: cargo clippy --verbose
+        run: cargo clippy --all-targets -- -D warnings
 
-      # Run cargo fmt for formatting
+      # Run rustfmt to check formatting
       - name: Run fmt
-        run: cargo fmt --verbose
+        run: cargo fmt --all -- --check
