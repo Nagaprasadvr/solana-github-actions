@@ -1,0 +1,78 @@
+# github action workflows to build solana sbf program , rust crates and test them
+name: CI
+
+# trigger workflows on pr
+on:
+  # uncomment if CI is needed to run on push
+  # push:
+  #   branches: ["main"]
+  pull_request:
+    branches: ["main"] # change branch accordingly
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Install Rust if its missing on the env
+      # Setup Environment
+      - name: Install Rust (if missing)
+        run: |
+          if ! command -v cargo &> /dev/null; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          fi
+
+      # cache solana tools
+      - name: Cache Solana tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/solana
+          key: ${{ runner.os }}-solana-anza-v1
+
+      # Install solana tools like (cli, buil-sbf etc)
+      - name: Install Solana tools (cargo-build-sbf)
+        run: |
+          if [ ! -f "$HOME/.local/share/solana/install/active_release/bin/cargo-build-sbf" ]; then
+            sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          fi
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      # Cache cargo compiled deps
+      - name: Cache cargo registry and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      # If your repo is a workspace use this to build
+      # all the crates in the workspace or else comment this
+      - name: Build
+        run: cargo build --verbose
+
+      # Build SBF solana program by passing the manifest path
+      - name: Build Solana SBF program
+        run: cargo build-sbf --manifest-path=program/Cargo.toml --verbos
+
+      # Run cargo test (unit , integration etc) with required feature flags or args
+      - name: Run tests
+        run: cargo test --verbose
+
+      # Run cargo clippy to cleanup code
+      - name: Run clippy
+        run: cargo clippy --verbose
+
+      # Run cargo fmt for formatting
+      - name: Run fmt
+        run: cargo fmt --verbose
