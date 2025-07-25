@@ -65,7 +65,7 @@ jobs:
 
       # Run all tests (unit, integration, etc)
       - name: Run tests
-        run: cargo test --verbose
+        run: cargo test --all --verbose --all-features
 
       # Run Clippy for linting
       - name: Run clippy
@@ -73,4 +73,4 @@ jobs:
 
       # Run rustfmt to check formatting
       - name: Run fmt
-        run: cargo fmt --all -- --check
+        run: cargo +nightly fmt --all -- --check
